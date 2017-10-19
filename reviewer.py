@@ -27,14 +27,14 @@ s_w.sort()
 class Reviewer():
     # a has a training, and methods for evaluating reviews,
     # might also take directories as a parameter, both for stopwords, training data, and test data
-    def __init__(self, p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path ):
+    def __init__(self, p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path):
         self.p_train_path = p_training_data_path
         self.n_train_path = n_training_data_path
         self.p_test_data_path = p_test_data_path
         self.n_test_data_path = n_test_data_path
-        self.all_reviews_trainig_data = Review()
-        self.p_review_training_data = Review()
-        self.n_review_training_data = Review()
+        self.all_reviews_data = Review()
+        self.positive_reviews_data = Review()
+        self.negative_reviews_data = Review()
 
         # generates the list of stop words, and sorts the list
         stop_words_file = open(sw_path)
@@ -93,7 +93,7 @@ class Reviewer():
         t_length = len(t)
         i = 0
         while i < (t_length):
-            if t[i] in s_w:
+            if t[i] in self.stop_words:
                 t.remove(t[i])
                 # both indexes needs to be subtracted from since the remaining indexes has changed.
                 t_length -= 1
@@ -102,7 +102,7 @@ class Reviewer():
         return t
     
 
-    # implementation part 4:
+    # implementation part 4 find information value: (done)
 
     def information_value(self, sub_set_prevalence, global_prevalence):
         info_value = defaultdict(float)
@@ -110,25 +110,6 @@ class Reviewer():
             info_value[word[0]] = float(word[1]/(global_prevalence.get(word[0])))
 
         return info_value
-
-
-
-    # implementation part 6: n_grams
-
-    def create_n_grams(self, word_list, n_value):
-        w_l = word_list
-        n_grams = []
-        if n_value not in [2,3]:
-            raise Exception("Illegal length of n_gram")
-        for i in range(len(w_l)- n_value + 1):
-            current_word = '' + str(w_l[i])
-            for n in range(1,n_value):
-                current_word +='_' + str(w_l[i+n])
-            n_grams.append(current_word)
-
-        return w_l + n_grams
-
-
 
 
     def find_prevalence_collection(self, reviews):
@@ -161,18 +142,72 @@ class Reviewer():
                 review_words.pop(word)
         return review_words
 
-    def train_reviewer(self):
+
+    # implementation part 6: n_grams (Done)
+    def create_n_grams(self, word_list, n_value):
+        w_l = word_list
+        n_grams = []
+        if n_value not in [2,3]:
+            raise Exception("Illegal length of n_gram")
+        for i in range(len(w_l)- n_value + 1):
+            current_word = '' + str(w_l[i])
+            for n in range(1,n_value):
+                current_word +='_' + str(w_l[i+n])
+            n_grams.append(current_word)
+
+        return w_l + n_grams
+
+
+    def train_reviewer(self, n_gram, prune_limit):
+        generated_pos_reviews = self.format_reviews(self.p_test_data_path, n_gram)
+        generated_neg_reviews = self.format_reviews(self.n_test_data_path, n_gram)
+
+        self.all_reviews_data.set_reviews(generated_pos_reviews + generated_neg_reviews)
+        self.positive_reviews_data.set_reviews(generated_pos_reviews)
+        self.negative_reviews_data.set_reviews(generated_neg_reviews)
+
+        # creating lists of prevalence of all words
+        self.all_reviews_data.set_word_prevalence(self.find_prevalence_collection(self.all_reviews_data.get_reviews()))
+        self.positive_reviews_data.set_word_prevalence(self.find_prevalence_collection(self.positive_reviews_data.get_reviews()))
+        self.negative_reviews_data.set_word_prevalence(self.find_prevalence_collection(self.negative_reviews_data.get_reviews()))
+
+        # assigning information_value to the words
+        self.positive_reviews_data.set_info_values(self.information_value(self.all_reviews_data.get_word_prevalence(),
+                                                                          self.positive_reviews_data.get_word_prevalence()))
+        self.negative_reviews_data.set_info_values(self.information_value(self.all_reviews_data.get_word_prevalence(),
+                                                                          self.negative_reviews_data.get_word_prevalence()))
+        # generates prune words
 
         # this is where all functionality should go for entering the required data into the Review() objects
         pass
 
 
-
-
 class Review():
     def __init__(self):
         self.reviews = []
-        self.info_values = []
+        self.info_values = {}
         self.number_of_reviews = 0
+        self.word_prevalence = {}
 
+    def set_reviews(self, reviews):
+        self.reviews = reviews
+        self.number_of_reviews = len(self.reviews)
 
+    def get_reviews(self):
+        return self.reviews
+
+    def set_info_values(self, info_values):
+        self.info_values = info_values
+
+    def get_info_values(self):
+        return self.info_values
+
+    def set_word_prevalence(self, word_prevalence):
+        self.word_prevalence = word_prevalence
+
+    def get_word_prevalence(self):
+        return self.word_prevalence
+
+rew = Reviewer(sub_pos_train_path, sub_neg_train_path, sub_pos_test_path, sub_neg_test_path, stop_words_path)
+rew.train_reviewer(2,0.1)
+# p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path
