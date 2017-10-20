@@ -16,22 +16,15 @@ stop_words_path = "data/stop_words.txt"
 
 
 
-
-stop_words_file = open(stop_words_path)
-s_w = []
-for l in stop_words_file:
-    s_w.append(l.strip())
-s_w.sort()
-
-
 class Reviewer():
     # a has a training, and methods for evaluating reviews,
     # might also take directories as a parameter, both for stopwords, training data, and test data
-    def __init__(self, p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path):
+    def __init__(self, p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path, n_gram):
         self.p_train_path = p_training_data_path
         self.n_train_path = n_training_data_path
         self.p_test_data_path = p_test_data_path
         self.n_test_data_path = n_test_data_path
+        self.n_gram = n_gram
         self.all_reviews_data = Review()
         self.positive_reviews_data = Review()
         self.negative_reviews_data = Review()
@@ -114,10 +107,10 @@ class Reviewer():
 
     def find_prevalence_collection(self, reviews):
         number_of_reviews = len(reviews)
-        pos_count = defaultdict(int)
+        pos_count = defaultdict(float)
         for review in reviews:
             for word in review:
-                pos_count[word] += 1
+                pos_count[word] += float(1.0)
         return pos_count
 
 
@@ -158,9 +151,9 @@ class Reviewer():
         return w_l + n_grams
 
 
-    def train_reviewer(self, n_gram, prune_limit):
-        generated_pos_reviews = self.format_reviews(self.p_test_data_path, n_gram)
-        generated_neg_reviews = self.format_reviews(self.n_test_data_path, n_gram)
+    def train_reviewer(self, prune_limit):
+        generated_pos_reviews = self.format_reviews(self.p_test_data_path, self.n_gram)
+        generated_neg_reviews = self.format_reviews(self.n_test_data_path, self.n_gram)
 
         self.all_reviews_data.set_reviews(generated_pos_reviews + generated_neg_reviews)
         self.positive_reviews_data.set_reviews(generated_pos_reviews)
@@ -172,22 +165,35 @@ class Reviewer():
         self.negative_reviews_data.set_word_prevalence(self.find_prevalence_collection(self.negative_reviews_data.get_reviews()))
 
         # assigning information_value to the words
-        self.positive_reviews_data.set_info_values(self.information_value(self.all_reviews_data.get_word_prevalence(),
-                                                                          self.positive_reviews_data.get_word_prevalence()))
-        self.negative_reviews_data.set_info_values(self.information_value(self.all_reviews_data.get_word_prevalence(),
-                                                                          self.negative_reviews_data.get_word_prevalence()))
-        # generates prune words
+        self.positive_reviews_data.set_info_values(self.information_value(self.positive_reviews_data.get_word_prevalence(),
+                                                                          self.all_reviews_data.get_word_prevalence()))
 
-        # this is where all functionality should go for entering the required data into the Review() objects
-        pass
+        self.negative_reviews_data.set_info_values(self.information_value(self.negative_reviews_data.get_word_prevalence(),
+                                                                          self.all_reviews_data.get_word_prevalence()))
+        # generates prune words
+        prune_words = self.make_prune_list(self.all_reviews_data.get_reviews(), prune_limit)
+
+        print(len(self.positive_reviews_data.get_info_values()))
+        print(len(self.negative_reviews_data.get_info_values()))
+
+        # prune
+        self.positive_reviews_data.set_info_values(self.prune(self.positive_reviews_data.get_info_values(), prune_words))
+        self.negative_reviews_data.set_info_values(self.prune(self.negative_reviews_data.get_info_values(), prune_words))
+
+        # Training done
+
+    def review(self):
+        positive_test_reviews = self.format_reviews(self.p_test_data_path, self.n_gram)
+        negative_test_reviews = self.format_reviews(self.n_test_data_path, self.n_gram)
+
 
 
 class Review():
     def __init__(self):
         self.reviews = []
-        self.info_values = {}
+        self.info_values = None
         self.number_of_reviews = 0
-        self.word_prevalence = {}
+        self.word_prevalence = None
 
     def set_reviews(self, reviews):
         self.reviews = reviews
@@ -209,5 +215,5 @@ class Review():
         return self.word_prevalence
 
 rew = Reviewer(sub_pos_train_path, sub_neg_train_path, sub_pos_test_path, sub_neg_test_path, stop_words_path)
-rew.train_reviewer(2,0.1)
+rew.train_reviewer(0.01)
 # p_training_data_path, n_training_data_path , p_test_data_path, n_test_data_path, sw_path
